@@ -57,8 +57,8 @@ button:disabled{opacity:.6;cursor:default;}
   <div class="sync-status" id="syncStatus">Menghubungkan ke Google Sheet...</div>
 
   <div class="cards">
-    <div class="card"><div class="label">Saldo Sekarang</div><div class="value" id="saldoNow">Rp0</div></div>
-    <div class="card"><div class="label">Total P/L</div><div class="value" id="totalPL">Rp0</div></div>
+    <div class="card"><div class="label">Saldo Sekarang</div><div class="value" id="saldoNow">$0.00</div></div>
+    <div class="card"><div class="label">Total P/L</div><div class="value" id="totalPL">$0.00</div></div>
   </div>
 
   <div class="progress-wrap">
@@ -136,11 +136,17 @@ document.getElementById('swapBtn').addEventListener('click', ()=>{
   updateAmountHint();
 });
 
+// Backend mengembalikan { settings: {saldoAwal, target, kurs}, trades: [...] }.
+// state di frontend butuh field-field itu rata (flat), jadi di-flatten di sini.
+function applyApiResponse(data){
+  state = { ...(data.settings || {}), trades: data.trades || [] };
+}
+
 async function loadData(){
   statusEl.textContent = 'Menghubungkan ke Google Sheet...';
   try{
-    const res = await fetch(API_URL);
-    state = await res.json();
+    const res = await fetch(API_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    applyApiResponse(await res.json());
     statusEl.textContent = 'Tersinkron dengan Google Sheet';
   }catch(err){
     statusEl.textContent = 'Gagal konek ke Google Sheet — cek API_URL';
@@ -156,7 +162,7 @@ async function postAction(payload){
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // hindari CORS preflight
       body: JSON.stringify(payload)
     });
-    state = await res.json();
+    applyApiResponse(await res.json());
     statusEl.textContent = 'Tersinkron dengan Google Sheet';
   }catch(err){
     statusEl.textContent = 'Gagal menyimpan — cek koneksi/API_URL';
@@ -175,11 +181,13 @@ function render(){
   plEl.style.color = totalPL>=0 ? 'var(--green)' : 'var(--red)';
 
   const target = state.target || 0;
+  const saldoAwal = state.saldoAwal || 0;
   let pct = 0;
-  if(target > state.saldoAwal){
-    pct = Math.max(0, Math.min(100, ((saldoNow - state.saldoAwal) / (target - state.saldoAwal)) * 100));
-  } else if (target > 0 && saldoNow >= target){
-    pct = 100;
+  if(target > saldoAwal){
+    pct = Math.max(0, Math.min(100, ((saldoNow - saldoAwal) / (target - saldoAwal)) * 100));
+  } else if (target > 0){
+    // target sudah tercapai sejak saldo awal, atau target <= saldo awal
+    pct = saldoNow >= target ? 100 : 0;
   }
   document.getElementById('progressBar').style.width = pct.toFixed(0)+'%';
   document.getElementById('progressPct').textContent = pct.toFixed(0)+'% dari '+fmt(target);
@@ -239,7 +247,7 @@ document.getElementById('tradeForm').addEventListener('submit', (e)=>{
   postAction({ action: 'addTrade', trade: { date, pair, type, amount } });
   e.target.reset();
   document.getElementById('dateInput').value = date;
-  amountMode = 'IDR';
+  // amountMode sengaja tidak di-reset, biar mode input (Rp/$) tetap sesuai pilihan user
 });
 
 document.getElementById('dateInput').valueAsDate = new Date();
