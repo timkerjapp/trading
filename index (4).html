@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jurnal Trading</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --text:#1a1d23; --muted:#6b7280;
+  --border:#e5e7eb; --accent:#2563eb; --green:#16a34a; --red:#dc2626;
+  --input-bg:#ffffff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121317; --card:#1c1e24; --text:#eceef1; --muted:#9aa1ac;
+    --border:#2c2f36; --accent:#4f8cff; --green:#34d058; --red:#f87171;
+    --input-bg:#15171c;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 40px;}
+h1{font-size:20px;margin:0 0 4px;}
+.sync-status{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.card .label{font-size:12px;color:var(--muted);margin-bottom:4px;}
+.card .value{font-size:18px;font-weight:600;}
+.progress-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;}
+.progress-bar-bg{background:var(--border);border-radius:8px;height:10px;overflow:hidden;margin-top:8px;}
+.progress-bar-fill{background:var(--accent);height:100%;transition:width .3s;}
+.section-title{font-size:14px;font-weight:600;margin:18px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+form{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;}
+.row{display:flex;gap:8px;}
+input,select{flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);font-size:14px;min-width:0;}
+button{padding:10px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;}
+button.secondary{background:transparent;color:var(--muted);border:1px solid var(--border);}
+button:disabled{opacity:.6;cursor:default;}
+.trade-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.trade{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.trade .info{display:flex;flex-direction:column;gap:2px;}
+.trade .pair{font-weight:600;font-size:14px;}
+.trade .date{font-size:12px;color:var(--muted);}
+.trade .pl{font-weight:700;font-size:14px;white-space:nowrap;}
+.pl.pos{color:var(--green);}
+.pl.neg{color:var(--red);}
+.del-btn{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:20px 0;}
+.settings{display:flex;gap:8px;margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📊 Jurnal Trading</h1>
+  <div class="sync-status" id="syncStatus">Menghubungkan ke Google Sheet...</div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Saldo Sekarang</div><div class="value" id="saldoNow">Rp0</div></div>
+    <div class="card"><div class="label">Total P/L</div><div class="value" id="totalPL">Rp0</div></div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <div class="label" style="color:var(--muted);font-size:12px;">Progress ke Target</div>
+      <div style="font-size:12px;color:var(--muted);" id="progressPct">0%</div>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>
+    <div class="settings" style="margin-top:10px;">
+      <input id="saldoAwalInput" type="number" placeholder="Saldo awal" />
+      <input id="targetInput" type="number" placeholder="Target saldo" />
+    </div>
+    <div class="settings">
+      <input id="kursInput" type="number" placeholder="Kurs 1 USD = Rp" />
+      <button class="secondary" id="saveSettingsBtn">Simpan</button>
+    </div>
+  </div>
+
+  <div class="section-title">Tambah Transaksi</div>
+  <form id="tradeForm">
+    <div class="row">
+      <input id="pairInput" type="text" placeholder="Pair (misal XAUUSD)" required />
+      <input id="dateInput" type="date" required />
+    </div>
+    <div class="row">
+      <select id="typeInput">
+        <option value="profit">Profit</option>
+        <option value="loss">Loss</option>
+      </select>
+      <input id="amountInput" type="number" placeholder="Jumlah (Rp)" required min="0" step="any" />
+      <button type="button" id="swapBtn" class="secondary" style="flex:0 0 auto;" title="Tukar mata uang">⇄</button>
+    </div>
+    <div id="amountHint" style="font-size:12px;color:var(--muted);"></div>
+    <button type="submit" id="submitBtn">+ Tambah</button>
+  </form>
+
+  <div class="section-title">Riwayat</div>
+  <div class="trade-list" id="tradeList"><div class="empty">Memuat data...</div></div>
+</div>
+
+<script>
+// GANTI dengan URL Web App Apps Script kamu setelah deploy
+const API_URL = 'https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec';
+
+let state = { saldoAwal: 0, target: 0, kurs: 0, trades: [] };
+let amountMode = 'IDR'; // 'IDR' atau 'USD' — mata uang yang sedang diisi di form
+const fmt = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtIdr = n => 'Rp' + Math.round(n).toLocaleString('id-ID');
+const statusEl = document.getElementById('syncStatus');
+
+function updateAmountHint(){
+  const amountInput = document.getElementById('amountInput');
+  const hint = document.getElementById('amountHint');
+  amountInput.placeholder = amountMode === 'IDR' ? 'Jumlah (Rp)' : 'Jumlah ($)';
+  const val = parseFloat(amountInput.value);
+  const kurs = state.kurs || 0;
+  if(isNaN(val) || kurs <= 0){
+    hint.textContent = kurs <= 0 ? 'Isi kurs USD dulu di atas' : '';
+    return;
+  }
+  hint.textContent = amountMode === 'IDR'
+    ? '≈ ' + fmt(val / kurs)
+    : '≈ ' + fmtIdr(val * kurs);
+}
+
+document.getElementById('amountInput').addEventListener('input', updateAmountHint);
+document.getElementById('swapBtn').addEventListener('click', ()=>{
+  const amountInput = document.getElementById('amountInput');
+  const val = parseFloat(amountInput.value);
+  const kurs = state.kurs || 0;
+  if(!isNaN(val) && kurs > 0){
+    amountInput.value = amountMode === 'IDR' ? (val / kurs).toFixed(2) : Math.round(val * kurs);
+  }
+  amountMode = amountMode === 'IDR' ? 'USD' : 'IDR';
+  updateAmountHint();
+});
+
+async function loadData(){
+  statusEl.textContent = 'Menghubungkan ke Google Sheet...';
+  try{
+    const res = await fetch(API_URL);
+    state = await res.json();
+    statusEl.textContent = 'Tersinkron dengan Google Sheet';
+  }catch(err){
+    statusEl.textContent = 'Gagal konek ke Google Sheet — cek API_URL';
+  }
+  render();
+}
+
+async function postAction(payload){
+  document.getElementById('submitBtn').disabled = true;
+  try{
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // hindari CORS preflight
+      body: JSON.stringify(payload)
+    });
+    state = await res.json();
+    statusEl.textContent = 'Tersinkron dengan Google Sheet';
+  }catch(err){
+    statusEl.textContent = 'Gagal menyimpan — cek koneksi/API_URL';
+  }
+  document.getElementById('submitBtn').disabled = false;
+  render();
+}
+
+function render(){
+  const totalPL = state.trades.reduce((s,t)=> s + (t.type==='profit'? t.amount : -t.amount), 0);
+  const saldoNow = (state.saldoAwal||0) + totalPL;
+
+  document.getElementById('saldoNow').textContent = fmt(saldoNow);
+  const plEl = document.getElementById('totalPL');
+  plEl.textContent = (totalPL>=0?'+':'') + fmt(totalPL);
+  plEl.style.color = totalPL>=0 ? 'var(--green)' : 'var(--red)';
+
+  const target = state.target || 0;
+  let pct = 0;
+  if(target > state.saldoAwal){
+    pct = Math.max(0, Math.min(100, ((saldoNow - state.saldoAwal) / (target - state.saldoAwal)) * 100));
+  } else if (target > 0 && saldoNow >= target){
+    pct = 100;
+  }
+  document.getElementById('progressBar').style.width = pct.toFixed(0)+'%';
+  document.getElementById('progressPct').textContent = pct.toFixed(0)+'% dari '+fmt(target);
+
+  document.getElementById('saldoAwalInput').value = state.saldoAwal || '';
+  document.getElementById('targetInput').value = state.target || '';
+  document.getElementById('kursInput').value = state.kurs || '';
+  updateAmountHint();
+
+  const list = document.getElementById('tradeList');
+  list.innerHTML = '';
+  if(!state.trades || state.trades.length === 0){
+    list.innerHTML = '<div class="empty">Belum ada transaksi dicatat.</div>';
+    return;
+  }
+  const sorted = [...state.trades].sort((a,b)=> b.date.localeCompare(a.date));
+  sorted.forEach(t=>{
+    const row = document.createElement('div');
+    row.className = 'trade';
+    row.innerHTML = `
+      <div class="info">
+        <div class="pair">${t.pair}</div>
+        <div class="date">${t.date}</div>
+      </div>
+      <div class="pl ${t.type==='profit'?'pos':'neg'}">${t.type==='profit'?'+':'-'}${fmt(t.amount)}</div>
+      <button class="del-btn" data-id="${t.id}" title="Hapus">✕</button>
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      postAction({ action: 'deleteTrade', id: btn.dataset.id });
+    });
+  });
+}
+
+document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+  const saldoAwal = parseFloat(document.getElementById('saldoAwalInput').value) || 0;
+  const target = parseFloat(document.getElementById('targetInput').value) || 0;
+  const kurs = parseFloat(document.getElementById('kursInput').value) || 0;
+  postAction({ action: 'updateSettings', settings: { saldoAwal, target, kurs } });
+});
+
+document.getElementById('tradeForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const pair = document.getElementById('pairInput').value.trim();
+  const date = document.getElementById('dateInput').value;
+  const type = document.getElementById('typeInput').value;
+  const rawAmount = parseFloat(document.getElementById('amountInput').value);
+  if(!pair || !date || isNaN(rawAmount)) return;
+  const kurs = state.kurs || 0;
+  if(amountMode === 'IDR' && kurs <= 0){
+    alert('Isi kurs USD dulu sebelum mencatat dalam Rupiah.');
+    return;
+  }
+  const amount = amountMode === 'IDR' ? rawAmount / kurs : rawAmount;
+  postAction({ action: 'addTrade', trade: { date, pair, type, amount } });
+  e.target.reset();
+  document.getElementById('dateInput').value = date;
+  amountMode = 'IDR';
+});
+
+document.getElementById('dateInput').valueAsDate = new Date();
+loadData();
+</script>
+</body>
+</html>
